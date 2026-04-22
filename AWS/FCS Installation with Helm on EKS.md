@@ -7,6 +7,14 @@
 
 ## General steps
 
+### If you are running Helm from AWS cloudshell, first install helm
+```bash
+curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+chmod 700 get_helm.sh
+./get_helm.sh
+```
+
+
 ### 1. Generate API client and secret with required permissions
 
 Go to Support and resources > Resources and tools > API clients and keys
@@ -91,7 +99,8 @@ When you use sidecar sensor deployment, existing pods will not have the sidecar 
 
 There are 2 modes for IAR - see https://falcon.crowdstrike.com/documentation/page/a0cf9976/deploy-image-assessment-at-runtime-with-a-helm-chart#s397745a
 
-**Watcher mode** - IAR runs as a single pod via k8s deployment. Require image pull permissions
+**Watcher mode** - IAR runs as a single pod via k8s deployment. Require image pull permissions. Recommended
+
 **Socket mode** - IAR runs as a daemonset (hence not suitable for fargate which does not support daemonset), does not require image pull permissions
 
 ## Environment variables
@@ -101,8 +110,7 @@ Replace the image tag version below with the right ones that you plan to use. Yo
 #!/bin/bash
 export FALCON_CLIENT_ID="<FALCON_CLIENT_ID>"
 export FALCON_CLIENT_SECRET="<FALCON_CLIENT_SECRET>"
-export FALCON_CID="<CUSTOMER_ID>"
-export FALCON_IMAGE_PULL_TOKEN="<FALCON_IMAGE_PULL_TOKEN>"
+export FALCON_CID="<CUSTOMER_ID_CHECKSUM>"
 
 ## for sensor as daemonset
 export SENSOR_IMAGE_TAG="7.33.0-18606-1"
@@ -119,6 +127,8 @@ export IAR_IMAGE_TAG="1.0.22"
 export IAR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-imageanalyzer"
 
 export CLUSTER_NAME="<CLUSTER_NAME>"
+
+export FALCON_SECRET_NAME=<your-falcon-secret-name>
 ```
 
 ## Authenticate to ECR and get config.json in docker directory as environment
@@ -169,7 +179,63 @@ The below commands will copy the latest image for the various FCS components fro
 aws eks update-kubeconfig --region <AWS_REGION> --name <CLUSTER_NAME>
 ```
 
-## Deploy sensor in daemonset, KAC and IAR with namespace creation
+## ONLY IF YOU USE K8S SECRETS FOR FALCON PARAMETERS - Here we assume you are going to create k8s secrets for the Helm deployment, therefore the namespaces need to be manually created
+```bash
+kubectl create namespace falcon-system
+kubectl create namespace falcon-kac
+kubectl create namespace falcon-image-analyzer
+```
+
+## ONLY IF YOU USE K8S SECRETS FOR FALCON PARAMETERS - create the required secrets for each component in the respective namespace
+```bash
+kubectl create secret generic $FALCON_SECRET_NAME -n falcon-system --from-literal=FALCONCTL_OPT_CID=$FALCON_CID
+
+kubectl create secret generic $FALCON_SECRET_NAME -n falcon-kac --from-literal=FALCONCTL_OPT_CID=$FALCON_CID
+
+kubectl create secret generic $FALCON_SECRET_NAME -n falcon-image-analyzer --from-literal=AGENT_CLIENT_ID=$FALCON_CLIENT_ID --from-literal=AGENT_CLIENT_SECRET=$FALCON_CLIENT_SECRET
+```
+
+## Deploy sensor in daemonset, KAC and IAR with K8S secrets for FALCON_CLIENT_ID, FALCON_CLIENT_SECRET, FALCON_CID and with tolerations for system node pool
+**Be careful of trailing spaces after backslash, there should not be any**
+
+The 3rd item in the array **falcon-sensor.node.daemonset.tolerations[3]** is what allows the sensor daemonset to tolerate the taint on system node and deploy onto it
+
+```bash
+helm upgrade --install falcon-platform crowdstrike/falcon-platform \
+  --namespace falcon-platform \
+  --set global.falconSecret.enabled=true \
+  --set global.falconSecret.secretName=$FALCON_SECRET_NAME \
+  --set global.containerRegistry.configJSON=$ENCODED_DOCKER_CONFIG \
+  --set falcon-sensor.enabled=true \
+  --set falcon-sensor.node.image.repository=$SENSOR_REGISTRY \
+  --set falcon-sensor.node.image.tag=$SENSOR_IMAGE_TAG \
+  --set "falcon-sensor.node.daemonset.tolerations[0].key=node-role.kubernetes.io/master" \
+  --set "falcon-sensor.node.daemonset.tolerations[0].operator=Exists" \
+  --set "falcon-sensor.node.daemonset.tolerations[0].effect=NoSchedule" \
+  --set "falcon-sensor.node.daemonset.tolerations[1].key=node-role.kubernetes.io/control-plane" \
+  --set "falcon-sensor.node.daemonset.tolerations[1].operator=Exists" \
+  --set "falcon-sensor.node.daemonset.tolerations[1].effect=NoSchedule" \
+  --set "falcon-sensor.node.daemonset.tolerations[2].key=kubernetes.azure.com/scalesetpriority" \
+  --set "falcon-sensor.node.daemonset.tolerations[2].operator=Equal" \
+  --set "falcon-sensor.node.daemonset.tolerations[2].value=spot" \
+  --set "falcon-sensor.node.daemonset.tolerations[2].effect=NoSchedule" \
+  --set "falcon-sensor.node.daemonset.tolerations[3].key=CriticalAddonsOnly" \
+  --set "falcon-sensor.node.daemonset.tolerations[3].operator=Exists" \
+  --set "falcon-sensor.node.daemonset.tolerations[3].effect=NoSchedule" \
+  --set falcon-kac.enabled=true \
+  --set falcon-kac.image.repository=$KAC_REGISTRY \
+  --set falcon-kac.image.tag=$KAC_IMAGE_TAG \
+  --set falcon-image-analyzer.enabled=true \
+  --set falcon-image-analyzer.deployment.enabled=true \
+  --set falcon-image-analyzer.image.repository=$IAR_REGISTRY \
+  --set falcon-image-analyzer.image.tag=$IAR_IMAGE_TAG \
+  --set falcon-image-analyzer.crowdstrikeConfig.clusterName=$CLUSTER_NAME \
+  --set falcon-image-analyzer.crowdstrikeConfig.cid=$FALCON_CID
+```
+
+
+
+## Deploy sensor in daemonset, KAC and IAR with namespace creation - without k8s secrets for FALCON_CLIENT_ID, FALCON_CLIENT_SECRET, FALCON_CID
 
 ```bash
 helm upgrade --install falcon-platform crowdstrike/falcon-platform \
@@ -193,7 +259,7 @@ helm upgrade --install falcon-platform crowdstrike/falcon-platform \
   --set falcon-image-analyzer.crowdstrikeConfig.clientSecret=$FALCON_CLIENT_SECRET
 ```
 
-## Deploy sensor as sidecar, KAC and IAR with namespace creation
+## Deploy sensor as sidecar, KAC and IAR with namespace creation - without k8s secrets for FALCON_CLIENT_ID, FALCON_CLIENT_SECRET, FALCON_CID
 
 ```bash
 helm upgrade --install falcon-platform crowdstrike/falcon-platform \
