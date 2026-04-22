@@ -24,17 +24,7 @@ export FALCON_CLIENT_ID="<YOUR_FALCON_CLIENT_ID>"
 export FALCON_CLIENT_SECRET="<YOUR_FALCON_CLIENT_SECRET>"
 ```
 
-## Step 2 - Get your Falcon CID with checksum
-
-On the portal, go to Host setup and management > Deploy > Sensor downloads and copy your CID with checksum
-
-Export to environment variable
-```bash
-export FALCON_CID="<YOUR_FALCON_CID_CHECKSUM>"
-```
-
-
-## Step 3 - Download Falcon pull script and copy container images from CRWD registry to ECR
+## Step 2 - Download Falcon pull script and copy container images from CRWD registry to ECR
 
 Here it is assume that AWS ECR is used. For other private registries, please authenticate to the registry using its supported authentication method
 
@@ -58,7 +48,7 @@ In your ECR, create the respective namespaces for the images, for example - falc
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-sensor \
-  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-sensor
+  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<your_namespace>
 ```
 
 **Copy Falcon KAC**
@@ -67,7 +57,7 @@ In your ECR, create the respective namespaces for the images, for example - falc
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-kac \
-  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-kac
+  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<your_namespace>
 ```
 
 **Copy Falcon Image Assessment Runtime**
@@ -76,20 +66,33 @@ In your ECR, create the respective namespaces for the images, for example - falc
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-imageanalyzer \
-  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-imageanalyzer
+  -c <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<your_namespace>
 ```
+
+If you need to use custom image names or paths in your registry, see https://falcon.crowdstrike.com/documentation/page/vc320402/retrieve-falcon-cloud-security-product-images-from-the-crowdstrike-registry#l0fa44c9 
 
 Verify that the images are successfully copied to ECR
 
 
-## Step 4 - install the Falcon Operator
+## Step 3 - install the Falcon Operator
 
-Installing v1.12.0 of the Falcon Operator which is latest as of 12 March 2026
+Installing v1.12.1 of the Falcon Operator which is latest as of 22 April 2026
 ```bash
-kubectl apply -f https://github.com/crowdstrike/falcon-operator/releases/download/v1.12.0/falcon-operator.yaml
+kubectl apply -f https://github.com/crowdstrike/falcon-operator/releases/download/v1.12.1/falcon-operator.yaml
 ```
 
-## Step 5 - Edit the deployment manifest
+## Step 4 - Create a kubernetes secret to contain the FALCON_CLIENT_ID and FALCON_CLIENT_SECRET
+
+```bash
+kubectl create ns falcon-secret
+
+kubectl create secret generic falcon-secrets -n falcon-secret \
+--from-literal=falcon-client-id=$FALCON_CLIENT_ID \
+--from-literal=falcon-client-secret=$FALCON_CLIENT_SECRET
+
+```
+
+## Step 4 - Edit the deployment manifest
 
 You can update the example deployment manifest below, which deploys the FalconAdmission, FalconImageAnalyzer, and the FalconNodeSensor using their default component configurations and pulls images from ECR
 
@@ -109,26 +112,25 @@ metadata:
     crowdstrike.com/provider: crowdstrike
   name: falcon-deployment
 spec:
-  falcon_api:
-    client_id: <FALCON_CLIENT_ID>
-    client_secret: <FALCON_CLIENT_SECRET>
-    cloud_region: autodiscover
+  falconSecret:
+    enabled: true
+    namespace: falcon-secret
+    secretName: falcon-secrets
   deployAdmissionController: true         
   deployNodeSensor: true                  
   deployImageAnalyzer: true               
   deployContainerSensor: false
   falconNodeSensor:
     node:
-      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-sensor/falcon-sensor:<TAG>
+      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/<YOUR_NAMESPACE>/falcon-sensor:<TAG>
       tolerations:
         - effect: NoSchedule
-          operator: Equal
+          operator: Exists
           key: CriticalAddonsOnly
-          value: NoSchedule      
   falconImageAnalyzer:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-imageanalyzer/falcon-imageanalyzer:<TAG>
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
   falconAdmission:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/falcon-kac/falcon-kac:<TAG>		
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>				
 ```
 
 ## Step 6 - deploy the manifest and verify the deployment
@@ -152,8 +154,15 @@ kubectl get pods -n falcon-operator | grep falconimageanalyzer
 Go to Cloud Security > Assets > Kubernetes and container inventory and you should see the EKS cluster with **KAC sensor ID** assigned, **KAC agent status** and **Cluster status** as active and **Management** status as Managed
 
 
+## Step 8 - to update the software versions of sensor, KAC, IAR
 
+```bash
+kubectl get falcondeployments
+NAME                OPERATOR VERSION   FALCON SENSOR
+falcon-deployment   1.12.1   
 
+kubectl edit falcondeployments falcon-deployment
+```
 
 ## Relevant documentation:
 - https://falcon.us-2.crowdstrike.com/documentation/page/a0cf9976/deploy-image-assessment-at-runtime-with-a-helm-chart

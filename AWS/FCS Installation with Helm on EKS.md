@@ -72,6 +72,8 @@ Make sure you have a Fargate profile that matches the namespaces of the componen
 - falcon-kac
 - falcon-image-analyzer
 
+You can also use a Fargate profile with a wildcard `*` to match any namespace to support the FCS components.
+
 Referring to https://docs.aws.amazon.com/eks/latest/userguide/fargate-getting-started.html#fargate-gs-coredns, you may want to have coredns pods running on fargate too, but this is normally the job of k8s admin
 
 Restart the following deployments so that they end up in fargate:
@@ -93,6 +95,7 @@ There are 2 modes for IAR - see https://falcon.crowdstrike.com/documentation/pag
 **Socket mode** - IAR runs as a daemonset (hence not suitable for fargate which does not support daemonset), does not require image pull permissions
 
 ## Environment variables
+Replace the image tag version below with the right ones that you plan to use. You can use this document [Using Skopeo container for image copy](../Misc/Using%20Skopeo%20container%20for%20image%20copy.md) to find the list of image tags available for each image.
 
 ```bash
 #!/bin/bash
@@ -103,17 +106,17 @@ export FALCON_IMAGE_PULL_TOKEN="<FALCON_IMAGE_PULL_TOKEN>"
 
 ## for sensor as daemonset
 export SENSOR_IMAGE_TAG="7.33.0-18606-1"
-export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<NAMESPACE>/falcon-sensor"
+export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-sensor"
 
 ## for sensor as sidecar
 export SENSOR_IMAGE_TAG="7.33.0-7205"
-export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<NAMESPACE>/falcon-container"
+export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-container"
 
 export KAC_IMAGE_TAG="7.33.0-3105"
-export KAC_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<NAMESPACE>/falcon-kac"
+export KAC_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-kac"
 
 export IAR_IMAGE_TAG="1.0.22"
-export IAR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<NAMESPACE>/falcon-imageanalyzer"
+export IAR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-imageanalyzer"
 
 export CLUSTER_NAME="<CLUSTER_NAME>"
 ```
@@ -121,7 +124,7 @@ export CLUSTER_NAME="<CLUSTER_NAME>"
 ## Authenticate to ECR and get config.json in docker directory as environment
 
 ```bash
-aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com
+aws ecr get-login-password --region <AWS_REGION> | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com
 
 export ENCODED_DOCKER_CONFIG=$(base64 -w 0 ~/.docker/config.json)
 ```
@@ -132,36 +135,38 @@ The ECR needs to have the repositories created in the format `<namespace>/<regis
 
 In the below, you need to pre-create the following repositories in ECR: `<namespace>/falcon-sensor`, `<namespace>/falcon-kac`, `<namespace>/falcon-imageanalyzer`, `<namespace>/falcon-container`
 
+The below commands will copy the latest image for the various FCS components from CRWD registry to ECR. If you want to specify a specific version, use the `--version <VERSION>`flag
+
 ```bash
 ./falcon-container-sensor-pull.sh \
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-sensor \
-  -c "<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<namespace>"
+  -c "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<namespace>"
 
 ./falcon-container-sensor-pull.sh \
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-kac \
-  -c "<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<namespace>"
+  -c "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<namespace>"
 
 ./falcon-container-sensor-pull.sh \
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-imageanalyzer \
-  -c "<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<namespace>"
+  -c "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<namespace>"
 
 ./falcon-container-sensor-pull.sh \
   --client-id ${FALCON_CLIENT_ID} \
   --client-secret ${FALCON_CLIENT_SECRET} \
   --type falcon-container \
-  -c "<AWS_ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/<namespace>"
+  -c "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<namespace>"
 ```
 
 ## Get kubeconfig file of EKS cluster
 
 ```bash
-aws eks update-kubeconfig --region ap-southeast-1 --name <CLUSTER_NAME>
+aws eks update-kubeconfig --region <AWS_REGION> --name <CLUSTER_NAME>
 ```
 
 ## Deploy sensor in daemonset, KAC and IAR with namespace creation
@@ -217,13 +222,14 @@ helm upgrade --install falcon-platform crowdstrike/falcon-platform \
 ```
 
 ## To uninstall
-
+Uninstall the helm chart, and then remove the namespace
 ```bash
 helm uninstall falcon-platform --namespace falcon-platform
+kubectl delete ns falcon-platform
 ```
 
 ## Run detections container in k8s
-
+If you want to simulate detections, you can run a CRWD provided detections container
 ```bash
 kubectl create -f https://raw.githubusercontent.com/CrowdStrike/detection-container/main/detections.example.yaml
 ```
