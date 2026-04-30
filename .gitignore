@@ -1,0 +1,38 @@
+# Credentials and secrets
+*.env
+*.env.local
+.env*
+
+# User configuration files (may contain sensitive data)
+# Add specific config files here if they contain actual credentials
+
+# Docker config files
+.docker/
+**/config.json
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Backup files
+*.bak
+*.backup
+
+.claude

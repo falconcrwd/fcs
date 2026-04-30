@@ -14,6 +14,12 @@ chmod 700 get_helm.sh
 ./get_helm.sh
 ```
 
+### Install the Helm chart
+```bash
+helm repo add crowdstrike https://crowdstrike.github.io/falcon-helm
+helm repo update
+```
+
 
 ### 1. Generate API client and secret with required permissions
 
@@ -70,9 +76,9 @@ The Falcon sensor for Linux installed directly on the host.
 
 ### 6. Private container image registry
 
-Private container image registry to store the downloaded images from CRWD registry. K8S should have access to this private container registry
+You should have a private container image registry to store the downloaded images from CRWD registry. K8S should have access to this private container registry
 
-### 7. For EKS Fargate
+### 7. Only for EKS Fargate
 
 Make sure you have a Fargate profile that matches the namespaces of the components to allow them to be created in Fargate compute, namely:
 
@@ -113,17 +119,17 @@ export FALCON_CLIENT_SECRET="<FALCON_CLIENT_SECRET>"
 export FALCON_CID="<CUSTOMER_ID_CHECKSUM>"
 
 ## for sensor as daemonset
-export SENSOR_IMAGE_TAG="7.33.0-18606-1"
+export SENSOR_IMAGE_TAG="<TAG>"
 export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-sensor"
 
 ## for sensor as sidecar
-export SENSOR_IMAGE_TAG="7.33.0-7205"
+export SENSOR_IMAGE_TAG="<TAG>"
 export SENSOR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-container"
 
-export KAC_IMAGE_TAG="7.33.0-3105"
+export KAC_IMAGE_TAG="<TAG>"
 export KAC_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-kac"
 
-export IAR_IMAGE_TAG="1.0.22"
+export IAR_IMAGE_TAG="<TAG>"
 export IAR_REGISTRY="<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/<NAMESPACE>/falcon-imageanalyzer"
 
 export CLUSTER_NAME="<CLUSTER_NAME>"
@@ -139,7 +145,7 @@ aws ecr get-login-password --region <AWS_REGION> | docker login --username AWS -
 export ENCODED_DOCKER_CONFIG=$(base64 -w 0 ~/.docker/config.json)
 ```
 
-## Copy from CrowdStrike registry and push to local ECR
+## Copy required images from CrowdStrike registry and push to local ECR
 
 The ECR needs to have the repositories created in the format `<namespace>/<registry-name>`
 
