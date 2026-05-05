@@ -74,6 +74,22 @@ done
 
 log_success "Configuration loaded successfully"
 
+# Check if Helm is installed, if not, install it
+if ! command -v helm &> /dev/null; then
+    log_info "Helm not found. Installing Helm..."
+
+    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    chmod 700 get_helm.sh
+    ./get_helm.sh
+
+    # Clean up installation script
+    rm -f get_helm.sh
+
+    log_success "Helm installed successfully"
+else
+    log_success "Helm is already installed"
+fi
+
 # Download falcon-container-sensor-pull script
 log_info "Downloading falcon-container-sensor-pull.sh script"
 curl -sSL -o falcon-container-sensor-pull.sh "https://raw.githubusercontent.com/CrowdStrike/falcon-scripts/main/bash/containers/falcon-container-sensor-pull/falcon-container-sensor-pull.sh"
@@ -98,7 +114,7 @@ log_success "Retrieved Falcon CID: $FALCON_CID"
 
 # Login to AWS ECR
 log_info "Logging into AWS ECR"
-aws ecr get-login-password --region "${AWS_REGION}" --profile "${AWS_PROFILE}" | \
+aws ecr get-login-password --region "${AWS_REGION}" --profile "${AWS_PROFILE}" --no-paginate | \
     docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 log_success "Logged into AWS ECR"
 
@@ -172,7 +188,7 @@ export IAR_IMAGE_TAG="${IAR_TAG}"
 
 # Update kubeconfig
 log_info "Updating kubeconfig for EKS cluster: $CLUSTER_NAME"
-aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" --profile "${AWS_PROFILE}"
+aws eks update-kubeconfig --region "${AWS_REGION}" --name "${CLUSTER_NAME}" --profile "${AWS_PROFILE}" --no-paginate
 log_success "Kubeconfig updated"
 
 # Create namespaces
