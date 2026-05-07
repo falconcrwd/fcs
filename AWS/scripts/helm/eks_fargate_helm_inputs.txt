@@ -1,0 +1,25 @@
+# Configuration file for EKS Fargate Falcon Platform deployment
+# Copy this file and update the values according to your environment
+
+# Falcon API Credentials (Required)
+FALCON_CLIENT_ID="your-falcon-client-id"
+FALCON_CLIENT_SECRET="your-falcon-client-secret"
+# Note: FALCON_CID will be automatically retrieved if not provided
+
+# AWS Configuration (Required)
+AWS_REGION="us-west-2"
+AWS_PROFILE="default"
+AWS_ACCOUNT_ID="123456789012"
+
+# EKS Cluster Configuration (Required)
+CLUSTER_NAME="your-eks-fargate-cluster"
+
+# Container Registry Configuration (Required)
+# Use your ECR repository namespace where images will be stored
+IMAGE_REPO_NAMESPACE="crwd"  # ECR repository namespace
+
+# Kubernetes Secret Configuration (Required)
+FALCON_SECRET_NAME="falcon-secret"
+
+# Optional: Falcon CID (will be auto-retrieved if not provided)
+# FALCON_CID="CC278D82343440BA81355459E9519AF7-6E"

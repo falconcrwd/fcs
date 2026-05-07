@@ -1,0 +1,55 @@
+# values.yaml for Falcon Platform on AWS EKS Fargate
+# This values file deploys the complete Falcon Platform stack optimized for Fargate:
+# - Container Sensor (for workload protection)
+# - Kubernetes Admission Controller (KAC)
+# - Image Analyzer (IAR)
+
+global:
+  falconSecret:
+    enabled: true
+    secretName: "${FALCON_SECRET_NAME}"
+
+falcon-sensor:
+  enabled: true
+  # Disable node sensor for Fargate (no direct node access)
+  node:
+    enabled: false
+  # Enable container sensor for workload protection
+  container:
+    enabled: true
+    image:
+      repository: "${CONTAINER_SENSOR_REGISTRY}"
+      tag: "${CONTAINER_SENSOR_IMAGE_TAG}"
+      pullSecrets:
+        enable: false
+        allNamespaces: false
+  # Let Helm create and manage the service account with IAM role annotation
+  serviceAccount:
+    name: crowdstrike-falcon-sa
+    annotations:
+      eks.amazonaws.com/role-arn: "${FALCON_SA_ROLE_ARN}"
+
+falcon-kac:
+  enabled: true
+  image:
+    repository: "${KAC_REGISTRY}"
+    tag: "${KAC_IMAGE_TAG}"
+  # Let Helm create and manage the service account with IAM role annotation
+  serviceAccount:
+    name: falcon-kac-sa
+    annotations:
+      eks.amazonaws.com/role-arn: "${KAC_SA_ROLE_ARN}"
+
+falcon-image-analyzer:
+  enabled: true
+  # Enable deployment mode for Image Analyzer
+  deployment:
+    enabled: true
+  image:
+    repository: "${IAR_REGISTRY}"
+    tag: "${IAR_IMAGE_TAG}"
+  crowdstrikeConfig:
+    clusterName: "${CLUSTER_NAME}"
+    clientID: "${FALCON_CLIENT_ID}"
+    clientSecret: "${FALCON_CLIENT_SECRET}"
+    cid: "${FALCON_CID}"

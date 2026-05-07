@@ -20,11 +20,12 @@ The `eks_node_helm_install.sh` script uses the [CrowdStrike Falcon Platform Helm
 
 ## 🛠 What the Script Does
 
-1. **Downloads Images**: Retrieves the latest Falcon container images from CrowdStrike registry
-2. **Pushes to ECR**: Uploads images to your AWS ECR repositories
-3. **Configures Environment**: Sets up all necessary environment variables
-4. **Deploys Components**: Installs the Falcon Platform using processed Helm values
-5. **Verifies Installation**: Checks pod status across all relevant namespaces
+1. **Installs Helm**: Automatically installs Helm if not already present on the system
+2. **Downloads Images**: Retrieves the latest Falcon container images from CrowdStrike registry
+3. **Pushes to ECR**: Uploads images to your AWS ECR repositories
+4. **Configures Environment**: Sets up all necessary environment variables
+5. **Deploys Components**: Installs the Falcon Platform using processed Helm values
+6. **Verifies Installation**: Checks pod status across all relevant namespaces
 
 ## ⚙️ Prerequisites
 
@@ -46,11 +47,10 @@ Create a Falcon API client with the following scopes ([documentation](https://fa
   - `curl`
   - `aws-cli`
   - `sed`
-  - `helm`
   - `docker`
   - `kubectl`
 
-> **💡 Tip**: You can use AWS CloudShell where most tools are pre-installed - you'll only need to install Helm manually.
+> **💡 Tip**: You can use AWS CloudShell where most tools are pre-installed. The installation script will automatically install **Helm** if it's not already present on your system.
 
 ### Installation Commands
 
@@ -66,12 +66,7 @@ Create a Falcon API client with the following scopes ([documentation](https://fa
 # https://docs.docker.com/engine/install/
 ```
 
-#### Helm
-```bash
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-chmod 700 get_helm.sh
-./get_helm.sh
-```
+> **Note**: Helm will be automatically installed by the deployment script if not already present.
 
 ### AWS ECR Repositories
 
