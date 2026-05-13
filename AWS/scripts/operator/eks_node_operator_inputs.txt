@@ -1,0 +1,18 @@
+# CrowdStrike Falcon Operator (EKS Node) Configuration
+# Replace the placeholder values below with your actual configuration
+
+# Falcon API Credentials (obtain from CrowdStrike Falcon console)
+FALCON_CLIENT_ID="your-falcon-client-id-here"
+FALCON_CLIENT_SECRET="your-falcon-client-secret-here"
+
+# AWS Configuration
+AWS_REGION="your-aws-region"
+AWS_PROFILE="default"
+AWS_ACCOUNT_ID="your-aws-account-id-here"
+
+# ECR and Kubernetes Configuration
+IMAGE_REPO_NAMESPACE="your-ecr-namespace"
+CLUSTER_NAME="your-eks-cluster-name"
+
+# Falcon Operator version to install (check https://github.com/crowdstrike/falcon-operator/releases for the latest release)
+FALCON_OPERATOR_VERSION="v1.12.1"
