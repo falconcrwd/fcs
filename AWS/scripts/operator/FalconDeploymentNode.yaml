@@ -1,0 +1,32 @@
+apiVersion: falcon.crowdstrike.com/v1alpha1
+kind: FalconDeployment
+metadata:
+  labels:
+    crowdstrike.com/component: sample
+    crowdstrike.com/created-by: falcon-operator
+    crowdstrike.com/instance: falcondeployment-sample
+    crowdstrike.com/managed-by: kustomize
+    crowdstrike.com/name: falcon-deployment
+    crowdstrike.com/part-of: Falcon
+    crowdstrike.com/provider: crowdstrike
+  name: falcon-deployment
+spec:
+  falconSecret:
+    enabled: true
+    namespace: falcon-secret
+    secretName: falcon-secrets
+  deployAdmissionController: true         
+  deployNodeSensor: true                  
+  deployImageAnalyzer: true               
+  deployContainerSensor: false
+  falconNodeSensor:
+    node:
+      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-sensor:<TAG>
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+          key: CriticalAddonsOnly
+  falconImageAnalyzer:
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
+  falconAdmission:
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>				
