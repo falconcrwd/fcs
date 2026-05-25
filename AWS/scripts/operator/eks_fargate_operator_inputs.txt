@@ -1,0 +1,35 @@
+# CrowdStrike Falcon Operator (EKS Fargate) Configuration
+# Replace the placeholder values below with your actual configuration
+
+# Falcon API Credentials (obtain from CrowdStrike Falcon console)
+FALCON_CLIENT_ID="your-falcon-client-id-here"
+FALCON_CLIENT_SECRET="your-falcon-client-secret-here"
+
+# AWS Configuration
+AWS_REGION="your-aws-region"
+AWS_PROFILE="default"
+AWS_ACCOUNT_ID="your-aws-account-id-here"
+
+# ECR and Kubernetes Configuration
+IMAGE_REPO_NAMESPACE="your-ecr-namespace"
+CLUSTER_NAME="your-eks-fargate-cluster-name"
+
+# Falcon Operator version to install
+# (check https://github.com/crowdstrike/falcon-operator/releases for the latest release)
+FALCON_OPERATOR_VERSION="v1.12.1"
+
+# IAM role names that will be created for IRSA (IAM Roles for Service Accounts).
+# Defaults are suffixed with the cluster name to keep them unique per cluster.
+# Override here if you want to reuse / pre-create roles with custom names.
+FALCON_INJECTOR_ROLE_NAME="FalconContainerInjectorRole-${CLUSTER_NAME}"
+FALCON_ADMISSION_ROLE_NAME="FalconAdmissionRole-${CLUSTER_NAME}"
+
+# Service account names the Falcon Operator will create for each component.
+# These must match what the operator creates - the trust policies are bound
+# to system:serviceaccount:<namespace>:<sa-name>. Defaults below match the
+# operator's defaults for FalconContainer and FalconAdmission.
+FALCON_INJECTOR_NAMESPACE="falcon-system"
+FALCON_INJECTOR_SA_NAME="crowdstrike-falcon-sa"
+
+FALCON_ADMISSION_NAMESPACE="falcon-kac"
+FALCON_ADMISSION_SA_NAME="falcon-kac-sa"

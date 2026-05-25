@@ -1,0 +1,43 @@
+apiVersion: falcon.crowdstrike.com/v1alpha1
+kind: FalconDeployment
+metadata:
+  labels:
+    crowdstrike.com/component: sample
+    crowdstrike.com/created-by: falcon-operator
+    crowdstrike.com/instance: falcondeployment-sample
+    crowdstrike.com/managed-by: kustomize
+    crowdstrike.com/name: falcon-deployment
+    crowdstrike.com/part-of: Falcon
+    crowdstrike.com/provider: crowdstrike
+  name: falcon-deployment
+spec:
+  falconSecret:
+    enabled: true
+    namespace: falcon-secret
+    secretName: falcon-secrets
+  # Fargate has no nodes, so disable the DaemonSet-based node sensor.
+  # Use the sidecar injector (FalconContainer) instead.
+  deployAdmissionController: true
+  deployNodeSensor: false
+  deployImageAnalyzer: true
+  deployContainerSensor: true
+  falconContainerSensor:
+    # If running in a mixed Fargate + EC2 cluster, change this to a different
+    # namespace (e.g. falcon-sidecar) to avoid colliding with FalconNodeSensor's
+    # default falcon-system namespace. The matching Fargate profile must target
+    # this namespace.
+    installNamespace: falcon-system
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-container:<TAG>
+    injector:
+      # IRSA annotation so the injector ServiceAccount can pull from ECR on Fargate.
+      serviceAccount:
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_CONTAINER_INJECTOR_ROLE>
+  falconImageAnalyzer:
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
+  falconAdmission:
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>
+    admissionConfig:
+      serviceAccount:
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_ADMISSION_ROLE>
