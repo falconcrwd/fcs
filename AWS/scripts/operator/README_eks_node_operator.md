@@ -36,12 +36,7 @@ To create/manage the policy in Falcon: **Host setup and management > Sensor upda
 To deploy with auto-update, either:
 
 - Rename / symlink `FalconDeploymentNodeAutoUpdate.yaml` to `FalconDeploymentNode.yaml` before running `eks_node_operator_install.sh` (the script looks for `FalconDeploymentNode.yaml` by default), or
-- Edit `eks_node_operator_install.sh` and change the `DEPLOYMENT_MANIFEST` variable to point at `FalconDeploymentNodeAutoUpdate.yaml`, or
-- Manually apply the processed manifest after the operator is installed:
-  ```bash
-  kubectl apply -f FalconDeploymentNodeAutoUpdate.yaml
-  ```
-  (substituting `<YOUR_AWS_ACCOUNT_ID>`, `<AWS_REGIONS>`, `<YOUR_NAMESPACE>` and `<TAG>` values as required)
+- Edit `eks_node_operator_install.sh` and change the `DEPLOYMENT_MANIFEST` variable to point at `FalconDeploymentNodeAutoUpdate.yaml`
 
 ### Key Features
 
