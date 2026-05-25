@@ -72,6 +72,7 @@ Create a Falcon API client with the following scopes ([documentation](https://fa
 - **Sensor Download** (read)
 - **Falcon Container CLI** (Read/Write)
 - **Falcon Container Image** (Read/Write)
+- **Sensor Update Policies** (Read) - required only if using `FalconDeploymentNodeAutoUpdate.yaml` (advanced `autoUpdate` enabled), so the Node Sensor can resolve the `linux-prod` update policy
 
 ### EKS Cluster Requirements
 

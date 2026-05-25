@@ -1,0 +1,56 @@
+apiVersion: falcon.crowdstrike.com/v1alpha1
+kind: FalconDeployment
+metadata:
+  labels:
+    crowdstrike.com/component: sample
+    crowdstrike.com/created-by: falcon-operator
+    crowdstrike.com/instance: falcondeployment-sample
+    crowdstrike.com/managed-by: kustomize
+    crowdstrike.com/name: falcon-deployment
+    crowdstrike.com/part-of: Falcon
+    crowdstrike.com/provider: crowdstrike
+  name: falcon-deployment
+spec:
+  falconSecret:
+    enabled: true
+    namespace: falcon-secret
+    secretName: falcon-secrets
+  # Mixed EKS cluster (EC2 node pools + Fargate):
+  #   - Node Sensor (DaemonSet) protects EC2 nodes
+  #   - Container Sensor (sidecar injector) protects pods scheduled on Fargate
+  #   - KAC (admission controller) and IAR (image analyzer) run on EC2 nodes
+  #     (their namespaces are intentionally NOT covered by a Fargate profile)
+  deployAdmissionController: true
+  deployNodeSensor: true
+  deployImageAnalyzer: true
+  deployContainerSensor: true
+  falconNodeSensor:
+    node:
+      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-sensor:<TAG>
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+          key: CriticalAddonsOnly
+      advanced:
+        autoUpdate: normal
+        updatePolicy: linux-prod
+  falconContainerSensor:
+    # Use a dedicated namespace for the Fargate sidecar injector so it does not
+    # collide with the FalconNodeSensor's default falcon-system namespace and
+    # so the Fargate profile can target it specifically.
+    installNamespace: falcon-injector
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-container:<TAG>
+    injector:
+      # IRSA annotation so the injector ServiceAccount can pull from ECR on Fargate.
+      serviceAccount:
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_CONTAINER_INJECTOR_ROLE>
+    advanced:
+      autoUpdate: normal
+      updatePolicy: linux-prod
+  falconImageAnalyzer:
+    # IAR runs on EC2 nodes in a mixed cluster (no IRSA required - uses node IAM).
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
+  falconAdmission:
+    # KAC runs on EC2 nodes in a mixed cluster (no IRSA required - uses node IAM).
+    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>
