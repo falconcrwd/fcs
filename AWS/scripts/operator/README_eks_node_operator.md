@@ -1,15 +1,26 @@
 # CrowdStrike Falcon Operator EKS Node Installation
 
-This script automates the deployment of the **CrowdStrike Falcon Operator** and a `FalconDeployment` custom resource on an existing AWS EKS cluster with node pools (EC2 worker nodes).
+These scripts automate the deployment of the **CrowdStrike Falcon Operator** and a `FalconDeployment` custom resource on an existing AWS EKS cluster with node pools (EC2 worker nodes).
 
 ## Overview
 
-The `eks_node_operator_install.sh` script deploys the Falcon Operator and uses the `FalconDeploymentNode.yaml` manifest to install the following security components via custom resources managed by the operator:
+Both the `eks_node_operator_install.sh` and `eks_node_operator_install_exist_image.sh` scripts deploy the Falcon Operator and use the `FalconDeploymentNode.yaml` manifest to install the following security components via custom resources managed by the operator:
 
 - **Falcon Node Sensor** (`deployNodeSensor: true`) - DaemonSet providing endpoint protection on every EKS node
 - **Kubernetes Admission Controller / KAC** (`deployAdmissionController: true`) - Runtime admission enforcement
 - **Image Assessment at Runtime / IAR** (`deployImageAnalyzer: true`) - Container image vulnerability scanning
 - **Container Sensor disabled** (`deployContainerSensor: false`) - Not needed on EC2 node pools since Node Sensor covers workloads
+
+### Choosing an installation script
+
+Two installation scripts are provided. Pick the one that matches the state of your AWS ECR:
+
+| Script | When to use | Inputs file |
+|--------|-------------|-------------|
+| `eks_node_operator_install.sh` | The Falcon Sensor, KAC and IAR images are **not** yet in ECR. The script pulls them from the CrowdStrike registry and pushes them to your ECR. | `eks_node_operator_inputs.txt` |
+| `eks_node_operator_install_exist_image.sh` | The Falcon Sensor, KAC and IAR images **already exist** in your ECR (for example, mirrored by a separate process or previous run). The script skips the CrowdStrike pull / ECR push and references the existing images directly. | `eks_node_operator_inputs_exist_image.txt` |
+
+The "exist image" variant additionally validates that each referenced image+tag is actually present in ECR (via `aws ecr describe-images`) before proceeding, and uses the user-supplied image names and tags when substituting into the `FalconDeploymentNode.yaml` manifest.
 
 ### Optional: Falcon Node Sensor Auto-Update
 
@@ -48,12 +59,14 @@ To deploy with auto-update, either:
 
 ## What the Script Does
 
-1. **Loads configuration** from `eks_node_operator_inputs.txt`
-2. **Installs `eksctl`** automatically if it is not already present on the host (with checksum verification)
-3. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo
-4. **Logs into AWS ECR** using the AWS CLI and Docker
-5. **Retrieves image tags** for `falcon-sensor`, `falcon-kac`, and `falcon-imageanalyzer`
-6. **Pulls and pushes** those images to your ECR namespace
+1. **Loads configuration** from `eks_node_operator_inputs.txt` (or `eks_node_operator_inputs_exist_image.txt` for the existing-image variant)
+2. **Installs `eksctl`** automatically if it is not already present on the host (with checksum verification). `eksctl` is then used later in step 8 to **configure an IAM OIDC provider** for the EKS cluster if one is not already associated.
+3. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo *(only if `eks_node_operator_install.sh` is used)*
+4. **Logs into AWS ECR** using the AWS CLI and Docker *(only if `eks_node_operator_install.sh` is used)*
+5. **Retrieves image tags** for `falcon-sensor`, `falcon-kac`, and `falcon-imageanalyzer` *(only if `eks_node_operator_install.sh` is used)*
+6. **Pulls and pushes** those images to your ECR namespace *(only if `eks_node_operator_install.sh` is used)*
+
+   *When `eks_node_operator_install_exist_image.sh` is used instead, steps 3-6 are replaced by an `aws ecr describe-images` verification confirming each user-supplied image+tag is already present in ECR.*
 7. **Updates kubeconfig** for the target EKS cluster
 8. **Associates the cluster with an IAM OIDC provider** using `eksctl utils associate-iam-oidc-provider --approve`
 9. **Installs the Falcon Operator** at the version specified in the inputs file and waits until the operator is Available
@@ -123,11 +136,13 @@ Create the following ECR repositories in your AWS account ahead of time:
    ```
 
 2. **Prepare Files**: Ensure all required files are in the same directory:
-   - `eks_node_operator_install.sh`
+   - `eks_node_operator_install.sh` **or** `eks_node_operator_install_exist_image.sh`
    - `FalconDeploymentNode.yaml`
-   - `eks_node_operator_inputs.txt`
+   - `eks_node_operator_inputs.txt` **or** `eks_node_operator_inputs_exist_image.txt`
 
-3. **Configure Variables**: Edit `eks_node_operator_inputs.txt` with your environment-specific values.
+3. **Configure Variables**: Edit the appropriate inputs file for the script you are running.
+
+   **`eks_node_operator_inputs.txt`** (used by `eks_node_operator_install.sh`):
 
    | Variable | Description |
    |----------|-------------|
@@ -140,9 +155,22 @@ Create the following ECR repositories in your AWS account ahead of time:
    | `CLUSTER_NAME` | Name of the target EKS cluster |
    | `FALCON_OPERATOR_VERSION` | Falcon Operator release tag (e.g. `v1.12.1`) |
 
+   **`eks_node_operator_inputs_exist_image.txt`** (used by `eks_node_operator_install_exist_image.sh`) - same as above, plus the existing image names and tags already in ECR:
+
+   | Variable | Description |
+   |----------|-------------|
+   | `SENSOR_IMAGE_NAME` | ECR repo name for the Falcon Node Sensor (e.g. `falcon-sensor`) |
+   | `SENSOR_IMAGE_TAG` | Existing tag of the Falcon Node Sensor image in ECR |
+   | `KAC_IMAGE_NAME` | ECR repo name for the Falcon KAC (e.g. `falcon-kac`) |
+   | `KAC_IMAGE_TAG` | Existing tag of the Falcon KAC image in ECR |
+   | `IAR_IMAGE_NAME` | ECR repo name for the Falcon Image Analyzer (e.g. `falcon-imageanalyzer`) |
+   | `IAR_IMAGE_TAG` | Existing tag of the Falcon Image Analyzer image in ECR |
+
 4. **Review Customization** (Optional): Check the [Falcon Operator repo](https://github.com/crowdstrike/falcon-operator) for additional `FalconDeployment` configuration options, including node selectors, resource limits and tolerations.
 
 ### Step 2: Execute Installation
+
+If pulling and pushing images from the CrowdStrike registry to ECR:
 
 ```bash
 # Make the script executable (already done by the install script if you followed the setup)
@@ -150,6 +178,16 @@ chmod +x eks_node_operator_install.sh
 
 # Run the installation
 ./eks_node_operator_install.sh
+```
+
+If the Sensor, KAC and IAR images already exist in your ECR:
+
+```bash
+# Make the script executable
+chmod +x eks_node_operator_install_exist_image.sh
+
+# Run the installation (uses eks_node_operator_inputs_exist_image.txt)
+./eks_node_operator_install_exist_image.sh
 ```
 
 ### Step 3: Verify Deployment
@@ -189,12 +227,14 @@ Navigate to **Cloud Security > Assets > Kubernetes and container inventory** in 
 
 ```
 AWS/scripts/operator/
-├── README_eks_node_operator.md          # This documentation
-├── eks_node_operator_install.sh         # Main installation script
-├── FalconDeploymentNode.yaml            # FalconDeployment manifest template (no auto-update)
-├── FalconDeploymentNodeAutoUpdate.yaml  # FalconDeployment manifest with Node Sensor auto-update enabled
-├── eks_node_operator_inputs.txt         # Configuration variables
-└── operator.md                          # Step-by-step manual operator reference
+├── README_eks_node_operator.md                  # This documentation
+├── eks_node_operator_install.sh                 # Installation script (pulls images from CrowdStrike, pushes to ECR)
+├── eks_node_operator_install_exist_image.sh     # Installation script for images already present in ECR
+├── FalconDeploymentNode.yaml                    # FalconDeployment manifest template (no auto-update)
+├── FalconDeploymentNodeAutoUpdate.yaml          # FalconDeployment manifest with Node Sensor auto-update enabled
+├── eks_node_operator_inputs.txt                 # Configuration variables for eks_node_operator_install.sh
+├── eks_node_operator_inputs_exist_image.txt     # Configuration variables for eks_node_operator_install_exist_image.sh
+└── operator.md                                  # Step-by-step manual operator reference
 ```
 
 ## Template Processing
