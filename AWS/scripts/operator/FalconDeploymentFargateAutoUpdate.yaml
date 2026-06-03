@@ -11,6 +11,12 @@ metadata:
     crowdstrike.com/provider: crowdstrike
   name: falcon-deployment
 spec:
+  # falcon_api is REQUIRED for auto-update to work.
+  # The Falcon Operator's auto-update gate (shouldTrackSensorVersions in
+  # internal/controller/falcon_container/falconcontainer_controller.go:400) returns
+  # false if Spec.FalconAPI is nil, even with autoUpdate: normal set below.
+  falcon_api:
+    cloud_region: autodiscover
   falconSecret:
     enabled: true
     namespace: falcon-secret
@@ -27,20 +33,14 @@ spec:
     # default falcon-system namespace. The matching Fargate profile must target
     # this namespace.
     installNamespace: falcon-system
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-container:<TAG>
-    injector:
-      # IRSA annotation so the injector ServiceAccount can pull from ECR on Fargate.
-      serviceAccount:
-        annotations:
-          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_CONTAINER_INJECTOR_ROLE>
+    # No image: field. The Falcon Operator resolves the sidecar image from
+    # registry.crowdstrike.com using the Falcon API credentials and the
+    # linux-prod sensor update policy. A pinned image would disable auto-update.
     advanced:
       autoUpdate: normal
       updatePolicy: linux-prod
-  falconImageAnalyzer:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
-  falconAdmission:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>
-    admissionConfig:
-      serviceAccount:
-        annotations:
-          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_ADMISSION_ROLE>
+  # No image: field for IAR or KAC. The operator resolves and pulls these from
+  # registry.crowdstrike.com on every reconcile, so no ECR mirroring or IRSA
+  # role-arn annotation is required.
+  falconImageAnalyzer: {}
+  falconAdmission: {}

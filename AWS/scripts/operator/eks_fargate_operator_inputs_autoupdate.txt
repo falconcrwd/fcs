@@ -1,0 +1,25 @@
+# CrowdStrike Falcon Operator (EKS Fargate - AutoUpdate) Configuration
+# This configuration is used with eks_fargate_operator_install_autoupdate.sh,
+# which pulls images directly from the CrowdStrike registry (no ECR mirroring,
+# no IRSA roles for ECR pulls). AutoUpdate of the Falcon Container Sensor
+# (sidecar) requires Falcon API credentials and unpinned images so the operator
+# can resolve and update the sensor version automatically.
+
+# Falcon API Credentials (obtain from CrowdStrike Falcon console)
+# Required scopes:
+#   - Falcon Images Download: Read
+#   - Sensor Download:        Read
+#   - Sensor Update Policies: Read   (required because of advanced.updatePolicy)
+FALCON_CLIENT_ID="your-falcon-client-id-here"
+FALCON_CLIENT_SECRET="your-falcon-client-secret-here"
+
+# AWS Configuration
+AWS_REGION="your-aws-region"
+AWS_PROFILE="default"
+
+# EKS Fargate cluster name
+CLUSTER_NAME="your-eks-fargate-cluster-name"
+
+# Falcon Operator version to install
+# (check https://github.com/crowdstrike/falcon-operator/releases for the latest release)
+FALCON_OPERATOR_VERSION="v1.12.1"

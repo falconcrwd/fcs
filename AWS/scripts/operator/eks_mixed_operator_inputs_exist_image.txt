@@ -1,0 +1,73 @@
+# CrowdStrike Falcon Operator (EKS Mixed Node + Fargate) Configuration - Existing ECR Images
+# Use this input file with eks_mixed_operator_install_exist_image.sh when the
+# Falcon Sensor, Container Sensor, KAC and Image Analyzer images are already
+# present in your AWS Elastic Container Registry (ECR). The script will skip
+# the pull-from-CrowdStrike-registry and push-to-ECR steps and will reference
+# the existing images directly.
+#
+# Note: this exist-image variant always applies FalconDeploymentMixed.yaml
+# (the non-auto-update mixed manifest). Auto-update is intentionally not
+# supported here because auto-update is incompatible with private/ECR registries.
+#
+# Replace the placeholder values below with your actual configuration.
+
+# Falcon API Credentials (obtain from CrowdStrike Falcon console)
+# These are still required because they are used to create the falcon-secrets
+# Kubernetes secret consumed by the Falcon Operator deployments.
+FALCON_CLIENT_ID="your-falcon-client-id-here"
+FALCON_CLIENT_SECRET="your-falcon-client-secret-here"
+
+# AWS Configuration
+AWS_REGION="your-aws-region"
+AWS_PROFILE="default"
+AWS_ACCOUNT_ID="your-aws-account-id-here"
+
+# ECR and Kubernetes Configuration
+# IMAGE_REPO_NAMESPACE is the path component in ECR under which the
+# falcon-sensor, falcon-container, falcon-kac, and falcon-imageanalyzer
+# repositories live.
+IMAGE_REPO_NAMESPACE="your-ecr-namespace"
+CLUSTER_NAME="your-eks-mixed-cluster-name"
+
+# Falcon Operator version to install
+# (check https://github.com/crowdstrike/falcon-operator/releases for the latest release)
+FALCON_OPERATOR_VERSION="v1.12.1"
+
+# -------------------------------------------------------------------------
+# IRSA configuration (Fargate-side only)
+# -------------------------------------------------------------------------
+# In a mixed cluster, only the Falcon Container Sensor injector runs on
+# Fargate, so only ONE IAM role is needed (for the injector ServiceAccount).
+# KAC and IAR are scheduled onto EC2 nodes and use the node IAM role for
+# ECR pulls.
+FALCON_INJECTOR_ROLE_NAME="FalconContainerInjectorRole-${CLUSTER_NAME}"
+
+# Service account / namespace the Falcon Operator will create for the
+# Container Sensor injector. These must match what the operator creates -
+# the trust policy is bound to system:serviceaccount:<namespace>:<sa-name>.
+# Namespace is the dedicated 'falcon-injector' namespace used by the mixed
+# manifest's spec.falconContainerSensor.installNamespace.
+FALCON_INJECTOR_NAMESPACE="falcon-injector"
+FALCON_INJECTOR_SA_NAME="crowdstrike-falcon-sa"
+
+# Existing ECR Image Names and Tags
+# These are the image repository names (within IMAGE_REPO_NAMESPACE) and the
+# image tags that already exist in your ECR. The full image reference used
+# by the Falcon Operator manifest will be built as:
+#   ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_REPO_NAMESPACE}/<IMAGE_NAME>:<IMAGE_TAG>
+
+# Falcon Node Sensor image (DaemonSet on EC2 nodes)
+SENSOR_IMAGE_NAME="falcon-sensor"
+SENSOR_IMAGE_TAG="your-existing-sensor-tag-here"
+
+# Falcon Container Sensor (sidecar) image (injected on Fargate)
+CONTAINER_IMAGE_NAME="falcon-container"
+CONTAINER_IMAGE_TAG="your-existing-container-tag-here"
+
+# Falcon Kubernetes Admission Controller (KAC) image
+KAC_IMAGE_NAME="falcon-kac"
+KAC_IMAGE_TAG="your-existing-kac-tag-here"
+
+# Falcon Image Analyzer (IAR) image
+IAR_IMAGE_NAME="falcon-imageanalyzer"
+IAR_IMAGE_TAG="your-existing-iar-tag-here"

@@ -11,6 +11,8 @@ metadata:
     crowdstrike.com/provider: crowdstrike
   name: falcon-deployment
 spec:
+  falcon_api:
+    cloud_region: autodiscover
   falconSecret:
     enabled: true
     namespace: falcon-secret
@@ -21,7 +23,6 @@ spec:
   deployContainerSensor: false
   falconNodeSensor:
     node:
-      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-sensor:<TAG>
       tolerations:
         - effect: NoSchedule
           operator: Exists
@@ -29,7 +30,5 @@ spec:
       advanced:
         autoUpdate: normal
         updatePolicy: linux-prod
-  falconImageAnalyzer:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
-  falconAdmission:
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>
+  falconImageAnalyzer: {}
+  falconAdmission: {}
