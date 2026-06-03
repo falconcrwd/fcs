@@ -1,0 +1,26 @@
+# CrowdStrike Falcon Operator (EKS Mixed Node + Fargate - AutoUpdate) Configuration
+# This configuration is used with eks_mixed_operator_install_autoupdate.sh, which
+# pulls images directly from the CrowdStrike registry (no ECR mirroring, no IRSA
+# role for the injector, no IAM policy for ECR pulls). AutoUpdate of the Node
+# Sensor (DaemonSet on EC2) and the Container Sensor (sidecar injector on Fargate)
+# requires Falcon API credentials and unpinned images so the operator can
+# resolve and update sensor versions automatically.
+
+# Falcon API Credentials (obtain from CrowdStrike Falcon console)
+# Required scopes:
+#   - Falcon Images Download: Read
+#   - Sensor Download:        Read
+#   - Sensor Update Policies: Read   (required because of advanced.updatePolicy)
+FALCON_CLIENT_ID="your-falcon-client-id-here"
+FALCON_CLIENT_SECRET="your-falcon-client-secret-here"
+
+# AWS Configuration
+AWS_REGION="your-aws-region"
+AWS_PROFILE="default"
+
+# EKS mixed cluster name (must have BOTH EC2 node pools AND Fargate profiles)
+CLUSTER_NAME="your-eks-mixed-cluster-name"
+
+# Falcon Operator version to install
+# (check https://github.com/crowdstrike/falcon-operator/releases for the latest release)
+FALCON_OPERATOR_VERSION="v1.12.1"

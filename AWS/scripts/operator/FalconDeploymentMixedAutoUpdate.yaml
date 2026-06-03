@@ -11,6 +11,12 @@ metadata:
     crowdstrike.com/provider: crowdstrike
   name: falcon-deployment
 spec:
+  # falcon_api is REQUIRED for auto-update to work for BOTH the Node Sensor
+  # (falconnodesensor_controller.go:1135) and the Container Sensor sidecar
+  # (falconcontainer_controller.go:400). The operator returns false from
+  # shouldTrackSensorVersions if Spec.FalconAPI is nil, even with autoUpdate set.
+  falcon_api:
+    cloud_region: autodiscover
   falconSecret:
     enabled: true
     namespace: falcon-secret
@@ -26,7 +32,9 @@ spec:
   deployContainerSensor: true
   falconNodeSensor:
     node:
-      image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-sensor:<TAG>
+      # No image: field. The operator resolves the sensor image from
+      # registry.crowdstrike.com using the Falcon API credentials and the
+      # linux-prod sensor update policy. A pinned image would disable auto-update.
       tolerations:
         - effect: NoSchedule
           operator: Exists
@@ -39,18 +47,19 @@ spec:
     # collide with the FalconNodeSensor's default falcon-system namespace and
     # so the Fargate profile can target it specifically.
     installNamespace: falcon-injector
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-container:<TAG>
-    injector:
-      # IRSA annotation so the injector ServiceAccount can pull from ECR on Fargate.
-      serviceAccount:
-        annotations:
-          eks.amazonaws.com/role-arn: arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:role/<FALCON_CONTAINER_INJECTOR_ROLE>
+    # No image: field. The operator resolves the container sensor image from
+    # registry.crowdstrike.com using the Falcon API credentials and the
+    # linux-prod sensor update policy.
+    #
+    # No injector.serviceAccount.annotations either: the operator generates a
+    # dockerconfigjson pull secret from the Falcon API credentials, so the
+    # injector pod on Fargate pulls directly from registry.crowdstrike.com
+    # without IRSA.
     advanced:
       autoUpdate: normal
       updatePolicy: linux-prod
-  falconImageAnalyzer:
-    # IAR runs on EC2 nodes in a mixed cluster (no IRSA required - uses node IAM).
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-imageanalyzer:<TAG>
-  falconAdmission:
-    # KAC runs on EC2 nodes in a mixed cluster (no IRSA required - uses node IAM).
-    image: <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGIONS>.amazonaws.com/<YOUR_NAMESPACE>/falcon-kac:<TAG>
+  # No image: field for IAR or KAC. The operator resolves and pulls these from
+  # registry.crowdstrike.com on every reconcile, so no ECR mirroring is needed
+  # and the EC2 node IAM role does not need ECR permissions.
+  falconImageAnalyzer: {}
+  falconAdmission: {}
