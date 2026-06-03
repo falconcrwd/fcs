@@ -163,53 +163,34 @@ Steps below replace the generic "image handling and IAM" portion of the run, bet
 
 #### `eks_mixed_operator_install.sh` (CrowdStrike -> ECR mirror, IRSA for injector)
 
-A. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo.
-
-B. **Logs into AWS ECR** using the AWS CLI and Docker.
-
-C. **Retrieves image tags** for `falcon-sensor`, `falcon-container`, `falcon-kac`, and `falcon-imageanalyzer` from the CrowdStrike registry.
-
-D. **Pulls and pushes** all four images to your ECR namespace.
-
-E. **Retrieves the cluster OIDC issuer URL** from `aws eks describe-cluster`.
-
-F. **Creates the `FalconContainerEcrPull` IAM policy** (idempotent).
-
-G. **Creates one IAM role** with an OIDC trust policy bound to `system:serviceaccount:${FALCON_INJECTOR_NAMESPACE}:${FALCON_INJECTOR_SA_NAME}` and attaches the ECR-pull policy. KAC and IAR rely on the EC2 node IAM role for ECR access in this topology.
-
-H. **Processes the chosen mixed manifest** with `sed` - substituting AWS account ID, region, ECR namespace, per-image tags, and the injector IAM role name.
-
-I. The operator creates the `crowdstrike-falcon-sa` ServiceAccount in `falcon-injector` annotated with `eks.amazonaws.com/role-arn`. Fargate-scheduled injector pods pull from ECR via IRSA. EC2-scheduled Node Sensor / KAC / IAR pods pull from ECR via the node IAM role.
+&nbsp;&nbsp;&nbsp;&nbsp;1. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. **Logs into AWS ECR** using the AWS CLI and Docker.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. **Retrieves image tags** for `falcon-sensor`, `falcon-container`, `falcon-kac`, and `falcon-imageanalyzer` from the CrowdStrike registry.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. **Pulls and pushes** all four images to your ECR namespace.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5. **Retrieves the cluster OIDC issuer URL** from `aws eks describe-cluster`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;6. **Creates the `FalconContainerEcrPull` IAM policy** (idempotent).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;7. **Creates one IAM role** with an OIDC trust policy bound to `system:serviceaccount:${FALCON_INJECTOR_NAMESPACE}:${FALCON_INJECTOR_SA_NAME}` and attaches the ECR-pull policy. KAC and IAR rely on the EC2 node IAM role for ECR access in this topology.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;8. **Processes the chosen mixed manifest** with `sed` - substituting AWS account ID, region, ECR namespace, per-image tags, and the injector IAM role name.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;9. The operator creates the `crowdstrike-falcon-sa` ServiceAccount in `falcon-injector` annotated with `eks.amazonaws.com/role-arn`. Fargate-scheduled injector pods pull from ECR via IRSA. EC2-scheduled Node Sensor / KAC / IAR pods pull from ECR via the node IAM role.
 
 #### `eks_mixed_operator_install_exist_image.sh` (images already in ECR, IRSA for injector)
 
-A. **Validates via `aws ecr describe-images`** that each user-supplied image name and tag (Sensor, Container Sensor, KAC, IAR) is already present in ECR. The script aborts with an error if any is missing.
-
-B. *No download from CrowdStrike, no docker push.*
-
-C. **Retrieves the cluster OIDC issuer URL** from `aws eks describe-cluster`.
-
-D. **Creates the `FalconContainerEcrPull` IAM policy** (idempotent).
-
-E. **Creates the same single IAM role** as `eks_mixed_operator_install.sh`, with an OIDC trust policy bound to `system:serviceaccount:${FALCON_INJECTOR_NAMESPACE}:${FALCON_INJECTOR_SA_NAME}`, and attaches the ECR-pull policy.
-
-F. **Processes `FalconDeploymentMixed.yaml`** with `sed` - substituting AWS account ID, region, ECR namespace, the injector IAM role name, and the user-supplied image names + tags from `eks_mixed_operator_inputs_exist_image.txt`.
-
-G. The operator creates the `crowdstrike-falcon-sa` ServiceAccount in `falcon-injector` annotated with `eks.amazonaws.com/role-arn`. Fargate-scheduled injector pods pull the existing image from ECR via IRSA; EC2-scheduled pods pull from ECR via the node IAM role.
+&nbsp;&nbsp;&nbsp;&nbsp;1. **Validates via `aws ecr describe-images`** that each user-supplied image name and tag (Sensor, Container Sensor, KAC, IAR) is already present in ECR. The script aborts with an error if any is missing.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. *No download from CrowdStrike, no docker push.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. **Retrieves the cluster OIDC issuer URL** from `aws eks describe-cluster`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. **Creates the `FalconContainerEcrPull` IAM policy** (idempotent).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5. **Creates the same single IAM role** as `eks_mixed_operator_install.sh`, with an OIDC trust policy bound to `system:serviceaccount:${FALCON_INJECTOR_NAMESPACE}:${FALCON_INJECTOR_SA_NAME}`, and attaches the ECR-pull policy.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;6. **Processes `FalconDeploymentMixed.yaml`** with `sed` - substituting AWS account ID, region, ECR namespace, the injector IAM role name, and the user-supplied image names + tags from `eks_mixed_operator_inputs_exist_image.txt`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;7. The operator creates the `crowdstrike-falcon-sa` ServiceAccount in `falcon-injector` annotated with `eks.amazonaws.com/role-arn`. Fargate-scheduled injector pods pull the existing image from ECR via IRSA; EC2-scheduled pods pull from ECR via the node IAM role.
 
 #### `eks_mixed_operator_install_autoupdate.sh` (direct from CrowdStrike, auto-update, no IRSA)
 
-A. *No download of `falcon-container-sensor-pull.sh`.*
-
-B. *No ECR login, no docker pull, no docker push.*
-
-C. *No `FalconContainerEcrPull` IAM policy, no IRSA role created.*
-
-D. *No `sed` template processing.* `FalconDeploymentMixedAutoUpdate.yaml` is applied as-is because all image fields are intentionally unpinned (a hard requirement for the operator's auto-update logic to engage).
-
-E. The Falcon Operator generates a `dockerconfigjson` pull secret from the Falcon API credentials in the `falcon-secrets` k8s secret. Both EC2-scheduled pods (Node Sensor / KAC / IAR) and Fargate-scheduled pods (Container Sensor injector) use that pull secret to pull images directly from `registry.crowdstrike.com`. On Fargate this works without IRSA because authentication occurs at the Kubernetes layer.
-
-F. The operator polls the CrowdStrike API on a schedule (default 24h) and reconciles the FalconNodeSensor and the FalconContainerSensor whenever a new sensor version is published in the `linux-prod` Sensor update policy.
+&nbsp;&nbsp;&nbsp;&nbsp;1. *No download of `falcon-container-sensor-pull.sh`.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. *No ECR login, no docker pull, no docker push.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. *No `FalconContainerEcrPull` IAM policy, no IRSA role created.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. *No `sed` template processing.* `FalconDeploymentMixedAutoUpdate.yaml` is applied as-is because all image fields are intentionally unpinned (a hard requirement for the operator's auto-update logic to engage).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5. The Falcon Operator generates a `dockerconfigjson` pull secret from the Falcon API credentials in the `falcon-secrets` k8s secret. Both EC2-scheduled pods (Node Sensor / KAC / IAR) and Fargate-scheduled pods (Container Sensor injector) use that pull secret to pull images directly from `registry.crowdstrike.com`. On Fargate this works without IRSA because authentication occurs at the Kubernetes layer.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;6. The operator polls the CrowdStrike API on a schedule (default 24h) and reconciles the FalconNodeSensor and the FalconContainerSensor whenever a new sensor version is published in the `linux-prod` Sensor update policy.
 
 ## Prerequisites
 
