@@ -141,39 +141,27 @@ Steps below replace the generic "image handling" portion of the run, between con
 
 #### `eks_node_operator_install.sh` (CrowdStrike -> ECR mirror)
 
-A. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo.
-
-B. **Logs into AWS ECR** using the AWS CLI and Docker.
-
-C. **Retrieves image tags** for `falcon-sensor`, `falcon-kac`, and `falcon-imageanalyzer` from the CrowdStrike registry.
-
-D. **Pulls and pushes** those images to your ECR namespace.
-
-E. **Processes `FalconDeploymentNode.yaml`** with `sed` - substituting the AWS account ID, region, ECR namespace and the per-image tags pulled in step C.
-
-F. EKS nodes pull from your ECR.
+&nbsp;&nbsp;&nbsp;&nbsp;1. **Downloads** `falcon-container-sensor-pull.sh` from the official CrowdStrike scripts repo.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. **Logs into AWS ECR** using the AWS CLI and Docker.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. **Retrieves image tags** for `falcon-sensor`, `falcon-kac`, and `falcon-imageanalyzer` from the CrowdStrike registry.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. **Pulls and pushes** those images to your ECR namespace.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5. **Processes `FalconDeploymentNode.yaml`** with `sed` - substituting the AWS account ID, region, ECR namespace and the per-image tags pulled in step 3.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;6. EKS nodes pull from your ECR.
 
 #### `eks_node_operator_install_exist_image.sh` (images already in ECR)
 
-A. **Validates via `aws ecr describe-images`** that each user-supplied image name and tag (Sensor, KAC, IAR) is already present in ECR. The script aborts with an error if any is missing.
-
-B. *No download from CrowdStrike, no docker push.*
-
-C. **Processes `FalconDeploymentNode.yaml`** with `sed` - substituting the AWS account ID, region, ECR namespace and the user-supplied image names + tags from `eks_node_operator_inputs_exist_image.txt`.
-
-D. EKS nodes pull from your ECR.
+&nbsp;&nbsp;&nbsp;&nbsp;1. **Validates via `aws ecr describe-images`** that each user-supplied image name and tag (Sensor, KAC, IAR) is already present in ECR. The script aborts with an error if any is missing.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. *No download from CrowdStrike, no docker push.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. **Processes `FalconDeploymentNode.yaml`** with `sed` - substituting the AWS account ID, region, ECR namespace and the user-supplied image names + tags from `eks_node_operator_inputs_exist_image.txt`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. EKS nodes pull from your ECR.
 
 #### `eks_node_operator_install_autoupdate.sh` (direct from CrowdStrike, auto-update)
 
-A. *No download of `falcon-container-sensor-pull.sh`.*
-
-B. *No ECR login, no docker pull, no docker push.*
-
-C. *No `sed` template processing.* `FalconDeploymentNodeAutoUpdate.yaml` is applied as-is because all image fields are intentionally unpinned (a hard requirement for the operator's auto-update logic to engage).
-
-D. The Falcon Operator generates a `dockerconfigjson` pull secret from the Falcon API credentials in the `falcon-secrets` k8s secret, and EKS nodes use that pull secret to pull images directly from `registry.crowdstrike.com`.
-
-E. The operator polls the CrowdStrike API on a schedule (default 24h) and reconciles the Node Sensor DaemonSet whenever a new sensor version is published.
+&nbsp;&nbsp;&nbsp;&nbsp;1. *No download of `falcon-container-sensor-pull.sh`.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;2. *No ECR login, no docker pull, no docker push.*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;3. *No `sed` template processing.* `FalconDeploymentNodeAutoUpdate.yaml` is applied as-is because all image fields are intentionally unpinned (a hard requirement for the operator's auto-update logic to engage).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;4. The Falcon Operator generates a `dockerconfigjson` pull secret from the Falcon API credentials in the `falcon-secrets` k8s secret, and EKS nodes use that pull secret to pull images directly from `registry.crowdstrike.com`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5. The operator polls the CrowdStrike API on a schedule (default 24h) and reconciles the Node Sensor DaemonSet whenever a new sensor version is published.
 
 ## Prerequisites
 
