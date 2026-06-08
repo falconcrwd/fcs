@@ -78,7 +78,7 @@ This approach assumes pulling directly from the CrowdStrike registry and using G
 ### Step 1: Install Falcon Operator
 
 ```bash
-kubectl apply -f https://github.com/crowdstrike/falcon-operator/releases/download/v1.11.0/falcon-operator.yaml
+kubectl apply -f https://github.com/crowdstrike/falcon-operator/releases/download/v1.13.0/falcon-operator.yaml
 ```
 
 ### Step 2: Create AllowlistSynchronizer
@@ -98,7 +98,7 @@ spec:
 ### Step 3: Deploy Falcon Components
 
 ```bash
-kubectl create -f https://raw.githubusercontent.com/crowdstrike/falcon-operator/refs/tags/v1.11.0/config/samples/falcon_v1alpha1_falcondeployment-node-sensor.yaml --edit=true
+kubectl create -f https://raw.githubusercontent.com/crowdstrike/falcon-operator/refs/tags/v1.13.0/config/samples/falcon_v1alpha1_falcondeployment-node-sensor.yaml --edit=true
 ```
 
 You can also use the following deployment YAML manifest:
@@ -106,6 +106,10 @@ You can also use the following deployment YAML manifest:
 ```bash
 kubectl create -f <filename.yaml>
 ```
+
+> **Note on IAR service account:** The `serviceAccount` annotation under `falconImageAnalyzer.imageAnalyzerConfig` is required to give the Image Analyzer at Runtime (IAR) the permissions to retrieve images from your private Artifact Registry for scanning. The annotation binds the IAR Kubernetes service account (auto-created by the falcon-operator) to a GCP IAM service account via Workload Identity. The GCP SA must be granted `roles/artifactregistry.reader` on the target repository (or project), and a `roles/iam.workloadIdentityUser` binding must link the GCP SA to the IAR KSA `falcon-iar/falcon-operator-image-analyzer`. See the inline comments in the manifest below for the exact `gcloud` commands.
+>
+> **⚠️ Registry exclusion (still under testing):** The `exclusions.registries` block is intended to skip IAR scanning of Google-managed system images served from the regional GKE release-staging Artifact Registry mirror (e.g. `<GOOGLE-REGION>-artifactregistry.gcr.io`). Even with a service account that has Artifact Reader permissions, IAR cannot authenticate to and pull these Google-managed images, so they should be excluded. **This exclusion configuration is still being validated** — the IAR agent matches on the bare registry host only (no path, no scheme), and behavior with this manifest is still being verified.
 
 Sample YAML deployment file for GKE Autopilot:
 
@@ -141,6 +145,85 @@ spec:
           operator: Equal
           key: kubernetes.io/arch
           value: amd64
+      advanced:
+        autoUpdate: normal
+        # The named sensor update policy below must already exist in the Falcon
+        # console (Host setup and management > Sensor update policies), be in
+        # the Enabled state, and target the host architecture(s) used by the
+        # GKE nodes (amd64 and/or arm64). On GKE Autopilot the default node
+        # arch is amd64; if you schedule arm64 workloads ensure the policy
+        # (or a separate policy you reference here) covers Linux arm64.
+        updatePolicy: linux-prod
+  falconImageAnalyzer:
+    imageAnalyzerConfig:
+      # Bind the IAR Kubernetes service account to a GCP IAM service account via
+      # Workload Identity so IAR can pull workload images from GCR / Artifact
+      # Registry to scan them. The falcon-operator auto-creates the IAR KSA
+      # "falcon-operator-image-analyzer" in namespace "falcon-iar" with the
+      # annotation set below; you do NOT create it manually.
+      #
+      # One-time GCP setup (run before or right after applying this CR):
+      #   # 1. Enable Workload Identity on the GKE Autopilot cluster (Autopilot
+      #   #    enables it by default; this is just a verification):
+      #   gcloud container clusters describe <CLUSTER_NAME> --region <REGION> \
+      #     --format="value(workloadIdentityConfig.workloadPool)"
+      #
+      #   # 2. Create the GCP IAM service account that IAR will impersonate:
+      #   gcloud iam service-accounts create falcon-iar-sa \
+      #     --project=<PROJECT_ID> \
+      #     --display-name="Falcon Image Analyzer at Runtime"
+      #
+      #   # 3. Grant it read access to the registry holding your workload images.
+      #   #    Use roles/artifactregistry.reader for Artifact Registry; do NOT use
+      #   #    roles/containerregistry.ServiceAgent (that is a GCP-managed service
+      #   #    agent role, not appropriate for user-owned service accounts).
+      #   #    For legacy GCR (gcr.io), grant roles/storage.objectViewer on the
+      #   #    bucket artifacts.<PROJECT_ID>.appspot.com instead.
+      #   #
+      #   #    Pick ONE of the scopes below:
+      #   #
+      #   #    a) Single Artifact Registry repository (least privilege):
+      #   gcloud artifacts repositories add-iam-policy-binding <AR_REPO> \
+      #     --location=<AR_LOCATION> \
+      #     --project=<PROJECT_ID> \
+      #     --member="serviceAccount:falcon-iar-sa@<PROJECT_ID>.iam.gserviceaccount.com" \
+      #     --role=roles/artifactregistry.reader
+      #   #
+      #   #    b) All Artifact Registry repos in the project (broader, simpler):
+      #   gcloud projects add-iam-policy-binding <PROJECT_ID> \
+      #     --member="serviceAccount:falcon-iar-sa@<PROJECT_ID>.iam.gserviceaccount.com" \
+      #     --role=roles/artifactregistry.reader
+      #
+      #   # 4. Bind the GCP SA to the IAR KSA via Workload Identity. This uses
+      #   #    the falcon-operator defaults: namespace "falcon-iar" and KSA
+      #   #    "falcon-operator-image-analyzer" (auto-created by the operator).
+      #   #    Change them only if you override spec.falconImageAnalyzer.installNamespace.
+      #   gcloud iam service-accounts add-iam-policy-binding \
+      #     falcon-iar-sa@<PROJECT_ID>.iam.gserviceaccount.com \
+      #     --project=<PROJECT_ID> \
+      #     --role=roles/iam.workloadIdentityUser \
+      #     --member="serviceAccount:<PROJECT_ID>.svc.id.goog[falcon-iar/falcon-operator-image-analyzer]"
+      #
+      # If IAR pods started before step 4, restart them:
+      #   kubectl rollout restart deploy -n falcon-iar
+      serviceAccount:
+        annotations:
+          iam.gke.io/gcp-service-account: falcon-iar-sa@<PROJECT_ID>.iam.gserviceaccount.com
+      registryConfig:
+        autoDiscoverCredentials: true
+      exclusions:
+        # Skip IAR scanning of GKE-managed images served from the regional
+        # GKE release-staging Artifact Registry mirror. The IAR agent matches
+        # on the BARE REGISTRY HOST ONLY (no path, no scheme); supplying a
+        # path like ".../gke-release-staging" silently fails to match and
+        # IAR will still try to pull (and 403) on those images.
+        #
+        # Replace <GOOGLE-REGION> with the region where the GKE cluster runs
+        # (e.g. us-central1, europe-west1, asia-southeast1). Excluding the
+        # whole host is appropriate here because this mirror only serves
+        # Google-managed system images that IAR cannot authenticate to.
+        registries:
+          - <GOOGLE-REGION>-artifactregistry.gcr.io
 ```
 
 ### References
@@ -237,7 +320,7 @@ You may want to check the latest versions of the node sensor, container sensor, 
 Use the following YAML file as a sample:
 
 ```bash
-kubectl create -f https://raw.githubusercontent.com/crowdstrike/falcon-operator/refs/tags/v1.11.0/config/samples/falcon_v1alpha1_falcondeployment-node-sensor.yaml --edit=true
+kubectl create -f https://raw.githubusercontent.com/crowdstrike/falcon-operator/refs/tags/v1.13.0/config/samples/falcon_v1alpha1_falcondeployment-node-sensor.yaml --edit=true
 ```
 
 Or save the manifest below and apply it:
