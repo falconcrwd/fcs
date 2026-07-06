@@ -1,6 +1,8 @@
 # Deploy Node and Container Sensor for EKS Hybrid
 
-This document provides instructions for deploying CrowdStrike Falcon sensors on Amazon EKS clusters with both managed nodes and Fargate, using Helm Charts.
+This document provides instructions for deploying CrowdStrike Falcon sensors on Amazon EKS clusters with both managed nodes and Fargate, using Helm Charts. General rule of thumb is:
+- you use Falcon Platform helm chart `crowdstrike/falcon-platform` to install node sensor, KAC and IAR onto the EKS nodes
+- you use Falcon Sensor helm chart `crowdstrike/falcon-sensor` to install injector pods into a namespace that is backed by Fargate profiles
 
 ## Prerequisites
 - you have already downloaded the node-sensor, container-sensor, KAC and IAR images into ECR. If not follow the instructions [here](https://falcon.crowdstrike.com/documentation/page/vc320402/retrieve-falcon-cloud-security-product-images-from-the-crowdstrike-registry)

@@ -38,3 +38,7 @@ Thumbs.db
 .claude
 
 GithubSRc
+
+# Local-only operator install variants (no secret)
+AWS/scripts/operator/eks_mixed_operator_install_autoupdate_nosecret.sh
+AWS/scripts/operator/FalconDeploymentMixedAutoUpdateNoSecret.yaml
