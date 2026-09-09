@@ -12,7 +12,59 @@ This documentation details how to configure Kyverno to automatically copy and sy
 
 ---
 
-## 1. Kyverno ClusterPolicy Manifest
+## 1. Installing Kyverno with the Required RBAC Extras
+
+Rather than installing Kyverno with the stock defaults and patching it afterwards, install it directly with the `patchkyverno.yaml` values file shipped alongside this doc (see `Misc/patchkyverno.yaml`). This ensures both the **Background Controller** and the **Admission Controller** already have the cluster-wide `Secret` permissions Kyverno needs to clone Falcon secrets across namespaces — so it is ready for use as soon as the install completes, with no follow-up upgrade required.
+
+### `patchkyverno.yaml`
+
+```yaml
+backgroundController:
+  rbac:
+    clusterRole:
+      extraResources:
+        - apiGroups: [""]
+          resources: ["secrets"]
+          verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+admissionController:
+  rbac:
+    clusterRole:
+      extraResources:
+        - apiGroups: [""]
+          resources: ["secrets"]
+          verbs: ["get", "list", "watch"]
+```
+
+### Install Commands
+
+Add the Kyverno Helm repository, refresh the index, then install Kyverno directly with `patchkyverno.yaml`:
+
+```bash
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm repo update
+helm install kyverno kyverno/kyverno \
+  -n kyverno \
+  --create-namespace \
+  --values=patchkyverno.yaml
+```
+
+> Run the `helm install` command from the same directory as `patchkyverno.yaml`, or pass the full path to the file via `--values`.
+
+If Kyverno is already installed (for example with the stock defaults) and you just want to layer these permissions on top, upgrade with the same values file instead:
+
+```bash
+helm upgrade kyverno kyverno/kyverno \
+  -n kyverno \
+  -f patchkyverno.yaml \
+  --reuse-values
+```
+
+After the install (or upgrade) completes, Kyverno is ready to apply the `ClusterPolicy` in the next section.
+
+---
+
+## 2. Kyverno ClusterPolicy Manifest
 
 The following policy triggers whenever a new `Namespace` is created or when an existing one is evaluated. It instructs Kyverno to automatically clone a Falcon secret (e.g., `crowdstrike-falcon-pull-secret`) from a central namespace (e.g., `default`) into target namespaces.
 
@@ -76,7 +128,7 @@ generate:
 
 ---
 
-## 2. Diagnosing and Verifying RBAC Permissions
+## 3. Diagnosing and Verifying RBAC Permissions
 
 Because Kyverno reads secrets globally and writes them across namespaces, its automated controllers require explicit cluster-wide permissions.
 
@@ -117,7 +169,7 @@ rules:
 
 ---
 
-## 3. Resolving Webhook Validation Failures
+## 4. Resolving Webhook Validation Failures
 
 ### The Error
 
@@ -136,9 +188,9 @@ Kyverno uses **two separate components** that require distinct sets of access ri
 
 ---
 
-## 4. Modifying Helm Settings Post-Installation
+## 5. Alternative Ways to Modify Helm Settings Post-Installation
 
-If you initially installed Kyverno using the standard remote defaults (`helm install kyverno kyverno/kyverno -n kyverno`), use one of the variations below to update both controller permission sets simultaneously.
+The recommended path is to install (or upgrade) Kyverno directly with `patchkyverno.yaml` as shown in Section 1. The options below are alternatives if you initially installed Kyverno using the standard remote defaults (`helm install kyverno kyverno/kyverno -n kyverno`) and need to layer the RBAC changes on afterwards without using `patchkyverno.yaml`.
 
 ### Option A: Inline Helm Upgrade (Fastest)
 
