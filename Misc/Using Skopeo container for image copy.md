@@ -115,13 +115,29 @@ docker run --rm \
 
 ### Copy Public Images (Example: Nginx)
 
+The commands below include flags that allow Skopeo/Docker to ignore any invalid certificate errors that may be caused by a proxy in use (e.g., TLS inspection by a corporate proxy).
+
+**Option 1: Using the Skopeo container**
+
 ```bash
 docker run --rm \
   quay.io/skopeo/stable copy --insecure-policy \
   --all \
   --dest-creds AWS:${ECR_PASSWORD} \
   docker://docker.io/library/nginx:latest \
-  docker://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/<ECR_NAMESPACE>/nginx
+  docker://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/<ECR_NAMESPACE>/<REPO_NAME>:<TAG>
+```
+
+**Option 2: Using Skopeo directly (native install)**
+
+```bash
+skopeo copy --insecure-policy \
+  --all \
+  --src-tls-verify=false \
+  --dest-tls-verify=false \
+  --dest-creds AWS:${ECR_PASSWORD} \
+  docker://docker.io/library/nginx:latest \
+  docker://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/<ECR_NAMESPACE>/<REPO_NAME>:<TAG>
 ```
 
 ---
@@ -240,4 +256,6 @@ Replace these placeholders with your specific values:
 - `<AWS_REGION>`: Your AWS region (e.g., `us-west-2`)
 - `<AWS_PROFILE_NAME>`: Your AWS CLI profile name
 - `<ECR_NAMESPACE>`: Your ECR repository namespace
+- `<REPO_NAME>`: Destination ECR repository name (e.g., `nginx`)
+- `<TAG>`: Destination image tag (e.g., `1.0`, `latest`)
 - `<VERSION>`, `<SENSOR_VERSION>`, etc.: Appropriate version tags for each component
